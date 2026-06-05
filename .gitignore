@@ -1,0 +1,26 @@
+# Secrets — never commit API keys (OpenAI / Gemini etc.)
+.env
+.env.*
+!.env.example
+
+# Dependencies
+node_modules/
+
+# Build output (Astro)
+dist/
+.astro/
+
+# Deploy
+.vercel/
+
+# OS / editor junk
+.DS_Store
+Thumbs.db
+*.log
+
+# SpecStory auto-save (Cursor history, not source)
+.specstory/
+
+# Personal drafts (case study etc. — keep out of the public repo)
+CASE_STUDY*
+_to-delete/
