@@ -1,23 +1,22 @@
 import { describe, it, expect } from "vitest";
 import { NodeSchema, EdgeSchema, parseLLMOutput } from "./dsl";
 import { computeLayout, dslToSkeletons, type Box, type RenderInput } from "./render";
-import { KITS, getKit } from "./theme";
+import { THEMES, getTheme } from "./theme";
 
 /**
  * Step 2 acceptance: given fixed DSL, the engine produces valid output, no
- * overlapping nodes, and arrows correctly bound to their from/to nodes — plus
- * the theme kit drives styling (role -> color) systematically.
+ * overlapping nodes, and arrows correctly bound — plus the theme's role table
+ * drives styling systematically (role -> style, theme -> look).
  */
 
 // --- helpers ---
 
-/** Zod gives Node/Edge defaults (e.g. role: "concept"); apply them so fixtures
- *  stay terse and realistic (LLM output is parsed the same way). */
+/** Zod gives Node/Edge defaults (e.g. role: "nodeSecondary"); apply them so
+ *  fixtures stay terse (LLM output is parsed the same way). */
 const node = (n: Record<string, unknown>) => NodeSchema.parse(n);
 const edge = (e: Record<string, unknown>) => EdgeSchema.parse(e);
 
 function overlaps(a: Box, b: Box): boolean {
-  // touching edges is fine; only true area overlap counts.
   return a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
 }
 
@@ -32,9 +31,8 @@ function expectNoOverlaps(boxes: Map<string, Box>) {
   }
 }
 
-// --- fixtures (hand-written DSL sets) ---
+// --- fixtures ---
 
-// F1: the canonical example — sun (circle) -> plant (rect), arrow "energy".
 const F1: RenderInput = {
   nodes: [
     node({ id: "sun", label: "Sun", shape: "circle" }),
@@ -43,13 +41,12 @@ const F1: RenderInput = {
   edges: [edge({ from: "sun", to: "plant", label: "energy" })],
 };
 
-// F2: a small flow with a decision diamond and one "key" node.
 const F2: RenderInput = {
   nodes: [
     node({ id: "input", label: "User input", shape: "rect" }),
     node({ id: "check", label: "Valid?", shape: "diamond" }),
-    node({ id: "save", label: "Save", shape: "rect", role: "key" }),
-    node({ id: "reject", label: "Reject", shape: "rect", role: "warning" }),
+    node({ id: "save", label: "Save", shape: "rect", role: "nodePrimary" }),
+    node({ id: "reject", label: "Reject", shape: "rect", role: "emphasis" }),
   ],
   edges: [
     edge({ from: "input", to: "check" }),
@@ -58,13 +55,12 @@ const F2: RenderInput = {
   ],
 };
 
-// F3: grouped nodes (two clusters) + a plain line connector.
 const F3: RenderInput = {
   nodes: [
     node({ id: "a1", label: "Idea A1", shape: "ellipse", group: "A" }),
     node({ id: "a2", label: "Idea A2", shape: "ellipse", group: "A" }),
     node({ id: "b1", label: "Idea B1", shape: "ellipse", group: "B" }),
-    node({ id: "note", label: "free note", shape: "text" }),
+    node({ id: "note", label: "free note", shape: "text", role: "body" }),
   ],
   edges: [edge({ from: "a1", to: "b1", style: "line" })],
 };
@@ -82,14 +78,12 @@ describe("computeLayout — no overlaps", () => {
 
   it("respects flow direction: target is placed to the right of source (LR)", () => {
     const boxes = computeLayout(F1);
-    const sun = boxes.get("sun")!;
-    const plant = boxes.get("plant")!;
-    expect(plant.x).toBeGreaterThan(sun.x);
+    expect(boxes.get("plant")!.x).toBeGreaterThan(boxes.get("sun")!.x);
   });
 });
 
 describe("dslToSkeletons — valid, well-formed output", () => {
-  it("emits one skeleton per node plus one per edge", () => {
+  it("emits one skeleton per node plus one per edge (no groups -> no frames)", () => {
     const sk = dslToSkeletons(F2);
     expect(sk).toHaveLength(F2.nodes.length + F2.edges.length);
   });
@@ -98,8 +92,7 @@ describe("dslToSkeletons — valid, well-formed output", () => {
     const byId = new Map(dslToSkeletons(F2).filter((s) => s.id).map((s) => [s.id, s]));
     expect(byId.get("input")!.type).toBe("rectangle");
     expect(byId.get("check")!.type).toBe("diamond");
-    const sun = dslToSkeletons(F1).find((s) => s.id === "sun")!;
-    expect(sun.type).toBe("ellipse"); // circle -> ellipse
+    expect(dslToSkeletons(F1).find((s) => s.id === "sun")!.type).toBe("ellipse"); // circle -> ellipse
   });
 
   it("renders a node's label as its bound text", () => {
@@ -115,48 +108,48 @@ describe("dslToSkeletons — valid, well-formed output", () => {
   });
 });
 
-describe("theme kit — role drives color, kit drives mood", () => {
-  it("colors a node by its role, from the kit's palette", () => {
-    const duotone = getKit("duotone");
-    const sk = dslToSkeletons(F2, duotone);
-    const save = sk.find((s) => s.id === "save")!; // role: key
-    const reject = sk.find((s) => s.id === "reject")!; // role: warning
-    expect(save.strokeColor).toBe(duotone.roleColors.key);
-    expect(reject.strokeColor).toBe(duotone.roleColors.warning);
+describe("theme — role drives style, theme drives look", () => {
+  it("styles a node from its role in the theme's table", () => {
+    const theme = getTheme("duotone-flat");
+    const save = dslToSkeletons(F2, theme).find((s) => s.id === "save")!; // nodePrimary
+    expect(save.strokeColor).toBe(theme.roles.nodePrimary.strokeColor);
+    expect(save.backgroundColor).toBe(theme.roles.nodePrimary.backgroundColor);
   });
 
-  it("gives 'key' a heavier stroke than a normal node", () => {
-    const sk = dslToSkeletons(F2, getKit("duotone"));
-    const save = sk.find((s) => s.id === "save")!; // key
-    const input = sk.find((s) => s.id === "input")!; // concept
-    expect(save.strokeWidth as number).toBeGreaterThan(input.strokeWidth as number);
+  it("renders the SAME role differently across themes (systematic, not random)", () => {
+    const duotone = dslToSkeletons(F2, getTheme("duotone-flat")).find((s) => s.id === "save")!;
+    const editorial = dslToSkeletons(F2, getTheme("editorial-geometric")).find((s) => s.id === "save")!;
+    expect(duotone.strokeColor).toBe(THEMES["duotone-flat"].roles.nodePrimary.strokeColor);
+    expect(editorial.strokeColor).toBe(THEMES["editorial-geometric"].roles.nodePrimary.strokeColor);
+    expect(duotone.strokeColor).not.toBe(editorial.strokeColor);
   });
 
-  it("renders the SAME role differently across kits (systematic, not random)", () => {
-    const notebook = dslToSkeletons(F2, getKit("notebook")).find((s) => s.id === "save")!;
-    const editorial = dslToSkeletons(F2, getKit("editorial")).find((s) => s.id === "save")!;
-    expect(notebook.strokeColor).toBe(KITS.notebook.roleColors.key);
-    expect(editorial.strokeColor).toBe(KITS.editorial.roleColors.key);
-    expect(notebook.strokeColor).not.toBe(editorial.strokeColor);
+  it("a heavier role (heading) gets a thicker stroke than body", () => {
+    const theme = getTheme("duotone-flat");
+    expect(theme.roles.heading.strokeWidth).toBeGreaterThan(theme.roles.body.strokeWidth);
   });
 
-  it("line roughness comes from the kit (clean vs hand vs sketchy)", () => {
-    const clean = dslToSkeletons(F1, getKit("duotone")).find((s) => s.id === "sun")!;
-    const hand = dslToSkeletons(F1, getKit("notebook")).find((s) => s.id === "sun")!;
-    const sketchy = dslToSkeletons(F1, getKit("marker")).find((s) => s.id === "sun")!;
-    expect(clean.roughness).toBe(0);
-    expect(hand.roughness).toBe(1);
-    expect(sketchy.roughness).toBe(2);
+  it("roughness comes from the theme (clean / natural / sketchy)", () => {
+    expect(dslToSkeletons(F1, getTheme("duotone-flat")).find((s) => s.id === "sun")!.roughness).toBe(0);
+    expect(dslToSkeletons(F1, getTheme("handwritten-notes")).find((s) => s.id === "sun")!.roughness).toBe(1);
+    expect(dslToSkeletons(F1, getTheme("doodle-sketch")).find((s) => s.id === "sun")!.roughness).toBe(2);
   });
 
-  it("tints grouped nodes (and leaves ungrouped ones transparent)", () => {
-    const kit = getKit("notebook");
-    const sk = dslToSkeletons(F3, kit);
-    const a1 = sk.find((s) => s.id === "a1")!; // group A
-    const b1 = sk.find((s) => s.id === "b1")!; // group B
-    expect(a1.backgroundColor).toBe(kit.groupTints[0]);
-    expect(b1.backgroundColor).toBe(kit.groupTints[1]);
-    expect(a1.backgroundColor).not.toBe(b1.backgroundColor); // distinct clusters
+  it("styles connectors from the theme's connector role", () => {
+    const theme = getTheme("editorial-geometric");
+    const arrow = dslToSkeletons(F2, theme).find((s) => s.type === "arrow")!;
+    expect(arrow.strokeColor).toBe(theme.roles.connector.strokeColor);
+  });
+
+  it("draws a frame behind each group, styled by the frame role", () => {
+    const theme = getTheme("handwritten-notes");
+    const sk = dslToSkeletons(F3, theme);
+    const frames = sk.filter((s) => s.type === "rectangle" && !s.id);
+    expect(frames).toHaveLength(2); // groups A and B
+    expect(frames[0].strokeColor).toBe(theme.roles.frame.strokeColor);
+    // frames come before the nodes (drawn behind)
+    const firstNodeIdx = sk.findIndex((s) => s.id);
+    expect(sk.indexOf(frames[0])).toBeLessThan(firstNodeIdx);
   });
 });
 
@@ -182,8 +175,7 @@ describe("dslToSkeletons — arrows correctly bound", () => {
     const pts = arrow.points as [number, number][];
     expect(pts).toHaveLength(2);
     const [, [dx, dy]] = pts;
-    const length = Math.hypot(dx, dy);
-    expect(length).toBeGreaterThan(20); // real span, reaches the other node
+    expect(Math.hypot(dx, dy)).toBeGreaterThan(20);
   });
 
   it("puts the edge label on the connector", () => {
@@ -196,8 +188,7 @@ describe("dslToSkeletons — arrows correctly bound", () => {
       nodes: [node({ id: "a", label: "A", shape: "rect" })],
       edges: [edge({ from: "a", to: "ghost" })],
     };
-    const connectors = dslToSkeletons(input).filter((s) => s.start);
-    expect(connectors).toHaveLength(0);
+    expect(dslToSkeletons(input).filter((s) => s.start)).toHaveLength(0);
   });
 });
 
@@ -207,7 +198,7 @@ describe("dsl validation gate", () => {
       ops: [{ op: "add", nodes: [{ id: "x", label: "X", shape: "rect" }] }],
     });
     expect(out).not.toBeNull();
-    expect(out!.ops[0].nodes[0].role).toBe("concept"); // default applied
+    expect(out!.ops[0].nodes[0].role).toBe("nodeSecondary"); // default applied
     expect(out!.ops[0].edges).toEqual([]); // default applied
   });
 

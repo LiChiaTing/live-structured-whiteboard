@@ -1,144 +1,125 @@
 /**
- * theme.ts — visual "kits."
+ * theme.ts — visual style kits (theme presets).
  *
- * The product idea: don't make users pick colors/lines/spacing one by one.
- * We curate a few good-looking kits (a kit = line roughness + role palette +
- * font + spacing + canvas tone). The user makes ONE choice (the look they want
- * today — no kit is tied to a scenario), and the system applies that kit
- * systematically: a content role always looks the same within a kit, so color
- * carries meaning instead of being decoration.
+ * Four ready-made whiteboard looks. The user picks one by scenario/mood; the
+ * render layer applies it systematically. The DSL only describes a node's
+ * semantic ROLE (heading / body / node / connector / frame / emphasis) — the
+ * theme decides what each role looks like. Switching theme = swapping this
+ * token table; the DSL and layout never change.
  *
- * Separation of concerns:
- *   - shape  -> form    (circle / rect / diamond / text)   [in dsl.ts]
- *   - role   -> meaning (concept / key / term / ...)         [colored here]
- *   - kit    -> look    (duotone / notebook / editorial / marker)  [this file]
- *
- * The four kits below are distilled from four visual references:
- *   duotone   = modern minimalist duotone (flat, 2 colors + neutral, airy)
- *   notebook  = handwritten information architecture (color-coded, organic)
- *   editorial = elegant geometric infographic (single accent, off-white, refined)
- *   marker    = hand-drawn doodle / whiteboard (roughest sketch, mono + 1 red)
+ * Spec source: docs/_zh-originals — "視覺風格 Kit (Theme Presets)".
  */
 
-import type { Role } from "./dsl";
+export type Roughness = 0 | 1 | 2; // 0 = precise, 1 = natural, 2 = sketchy
+export type FillStyle = "solid" | "hachure" | "cross-hatch";
+export type FontFamily = 1 | 2 | 3; // 1 = hand-drawn, 2 = sans, 3 = mono
+export type StrokeWidth = 1 | 2 | 4;
+export type StrokeStyle = "solid" | "dashed" | "dotted";
 
-export type ThemeKit = {
+export type RoleStyle = {
+  strokeColor: string;
+  backgroundColor?: string;
+  fillStyle?: FillStyle;
+  strokeWidth: StrokeWidth;
+  strokeStyle?: StrokeStyle;
+  fontFamily?: FontFamily;
+  fontSize?: number; // 16 / 20 / 28 / 36
+  rounded?: boolean;
+};
+
+/** Semantic roles the DSL can assign; the theme styles each one. */
+export type RoleName =
+  | "heading"
+  | "body"
+  | "nodePrimary"
+  | "nodeSecondary"
+  | "connector"
+  | "frame"
+  | "emphasis";
+
+export type Theme = {
   id: string;
   name: string;
-  /** Excalidraw roughness: 0 = clean/straight, 1 = hand-drawn, 2 = very sketchy. */
-  roughness: 0 | 1 | 2;
-  /** How shape fills are drawn (matters for grouped/tinted nodes). */
-  fillStyle: "solid" | "hachure" | "cross-hatch";
-  /** Excalidraw fontFamily: 1 = hand-drawn, 2 = normal, 3 = code. */
-  fontFamily: 1 | 2 | 3;
-  /** Per-role stroke (and text) color — this is where color gets its meaning. */
-  roleColors: Record<Role, string>;
-  /** "key" nodes get a heavier stroke; everything else uses the normal width. */
-  keyStrokeWidth: number;
-  normalStrokeWidth: number;
-  /** Connector (arrow/line) color. */
-  connectorColor: string;
-  /** Fills cycled across groups so clusters read as belonging together. */
-  groupTints: string[];
-  /** Optional canvas background tone (e.g. off-white for an editorial feel). */
-  canvasBackground?: string;
-  /** dagre layout tuning baked into the kit (white space lives here). */
-  layout: { rankdir: "LR" | "TB"; nodesep: number; ranksep: number };
+  pageBackground: string;
+  roughness: Roughness;
+  roles: Record<RoleName, RoleStyle>;
 };
 
-export const KITS: Record<string, ThemeKit> = {
-  // 1 — Modern minimalist duotone: clean flat lines, two high-contrast colors
-  // (orange + blue) over neutral, generous white space.
-  duotone: {
-    id: "duotone",
-    name: "Duotone",
+export const THEMES: Record<string, Theme> = {
+  // A — Duotone Flat: high-contrast two colors + neutral ink, flat, airy.
+  "duotone-flat": {
+    id: "duotone-flat",
+    name: "Duotone Flat",
+    pageBackground: "#FFFFFF",
     roughness: 0,
-    fillStyle: "solid",
-    fontFamily: 2,
-    roleColors: {
-      concept: "#1e293b",
-      key: "#2563eb", // blue — the hero
-      term: "#f97316", // orange — the counter-color
-      example: "#94a3b8",
-      warning: "#c2410c", // deep orange
+    roles: {
+      heading: { strokeColor: "#16161D", strokeWidth: 4, fontFamily: 2, fontSize: 28, rounded: true },
+      body: { strokeColor: "#16161D", strokeWidth: 2, fontFamily: 2, fontSize: 20 },
+      nodePrimary: { strokeColor: "#FF6B35", backgroundColor: "#FFE3D6", fillStyle: "solid", strokeWidth: 2, fontFamily: 2, fontSize: 20, rounded: true },
+      nodeSecondary: { strokeColor: "#2E5E8C", backgroundColor: "#E2ECF5", fillStyle: "solid", strokeWidth: 2, fontFamily: 2, fontSize: 20, rounded: true },
+      connector: { strokeColor: "#16161D", strokeWidth: 2, strokeStyle: "solid" },
+      frame: { strokeColor: "#2E5E8C", strokeWidth: 2, strokeStyle: "dashed", rounded: true },
+      emphasis: { strokeColor: "#FF6B35", strokeWidth: 4, fontFamily: 2, fontSize: 20 },
     },
-    keyStrokeWidth: 2.5,
-    normalStrokeWidth: 1.5,
-    connectorColor: "#475569",
-    groupTints: ["#eff6ff", "#fff7ed", "#f8fafc", "#f0fdf4"],
-    layout: { rankdir: "LR", nodesep: 90, ranksep: 150 },
   },
 
-  // 2 — Handwritten information architecture: hand font, color-coded
-  // (red = key/heading, blue = term, ink = body), organic and warm.
-  notebook: {
-    id: "notebook",
-    name: "Notebook",
+  // B — Handwritten Notes: color-coded (red headings, ink body, blue support),
+  // natural hand strokes, hatched frames. Closest to a real teacher's board.
+  "handwritten-notes": {
+    id: "handwritten-notes",
+    name: "Handwritten Notes",
+    pageBackground: "#FCFAF5",
     roughness: 1,
-    fillStyle: "solid",
-    fontFamily: 1,
-    roleColors: {
-      concept: "#1f2937", // ink body
-      key: "#dc2626", // red headings / keywords
-      term: "#2563eb", // blue
-      example: "#6b7280", // pencil gray
-      warning: "#b91c1c", // deeper red
+    roles: {
+      heading: { strokeColor: "#D7263D", strokeWidth: 2, fontFamily: 1, fontSize: 28 },
+      body: { strokeColor: "#20232A", strokeWidth: 1, fontFamily: 1, fontSize: 20 },
+      nodePrimary: { strokeColor: "#D7263D", backgroundColor: "transparent", strokeWidth: 2, fontFamily: 1, fontSize: 20, rounded: true },
+      nodeSecondary: { strokeColor: "#2A6FB0", backgroundColor: "transparent", strokeWidth: 1, fontFamily: 1, fontSize: 20, rounded: true },
+      connector: { strokeColor: "#20232A", strokeWidth: 1, strokeStyle: "solid" },
+      frame: { strokeColor: "#2A6FB0", backgroundColor: "#EAF2FA", fillStyle: "hachure", strokeWidth: 1, rounded: true },
+      emphasis: { strokeColor: "#D7263D", backgroundColor: "#F6C667", fillStyle: "hachure", strokeWidth: 2, fontFamily: 1, fontSize: 20 },
     },
-    keyStrokeWidth: 2.5,
-    normalStrokeWidth: 1.25,
-    connectorColor: "#4b5563",
-    groupTints: ["#fef2f2", "#eff6ff", "#f9fafb", "#fefce8"],
-    layout: { rankdir: "LR", nodesep: 70, ranksep: 120 },
   },
 
-  // 3 — Elegant geometric infographic: clean lines, a single refined accent,
-  // off-white canvas, otherwise grayscale — premium and restrained.
-  editorial: {
-    id: "editorial",
-    name: "Editorial",
+  // C — Editorial Geometric: single accent, off-white canvas, sharp corners,
+  // dramatic scale contrast. Premium and editorial.
+  "editorial-geometric": {
+    id: "editorial-geometric",
+    name: "Editorial Geometric",
+    pageBackground: "#F3EFE6",
     roughness: 0,
-    fillStyle: "solid",
-    fontFamily: 2,
-    roleColors: {
-      concept: "#3f3f46",
-      key: "#be123c", // the single accent (refined crimson)
-      term: "#52525b",
-      example: "#a1a1aa",
-      warning: "#be123c",
+    roles: {
+      heading: { strokeColor: "#2B2B2B", strokeWidth: 2, fontFamily: 2, fontSize: 36, rounded: false },
+      body: { strokeColor: "#2B2B2B", strokeWidth: 1, fontFamily: 2, fontSize: 18 },
+      nodePrimary: { strokeColor: "#C1121F", backgroundColor: "#C1121F", fillStyle: "solid", strokeWidth: 2, fontFamily: 2, fontSize: 20, rounded: false },
+      nodeSecondary: { strokeColor: "#2B2B2B", backgroundColor: "transparent", strokeWidth: 1, fontFamily: 2, fontSize: 20, rounded: false },
+      connector: { strokeColor: "#C1121F", strokeWidth: 2, strokeStyle: "solid" },
+      frame: { strokeColor: "#2B2B2B", strokeWidth: 1, strokeStyle: "solid", rounded: false },
+      emphasis: { strokeColor: "#C1121F", strokeWidth: 2, fontFamily: 2, fontSize: 28 },
     },
-    keyStrokeWidth: 2.5,
-    normalStrokeWidth: 1.25,
-    connectorColor: "#71717a",
-    groupTints: ["#f4f4f5", "#fafafa", "#f5f3f0", "#eeeeee"],
-    canvasBackground: "#faf8f4",
-    layout: { rankdir: "LR", nodesep: 90, ranksep: 150 },
   },
 
-  // 4 — Hand-drawn doodle / whiteboard: roughest sketchy strokes, hand font,
-  // mostly mono ink with a single red marker for warnings.
-  marker: {
-    id: "marker",
-    name: "Marker",
+  // D — Doodle Sketch: mono ink, roughest strokes, hatched fills, hand font,
+  // one accent color. Low-pressure, casual.
+  "doodle-sketch": {
+    id: "doodle-sketch",
+    name: "Doodle Sketch",
+    pageBackground: "#FCFCFA",
     roughness: 2,
-    fillStyle: "hachure",
-    fontFamily: 1,
-    roleColors: {
-      concept: "#2b2b2b",
-      key: "#2b2b2b", // mono — emphasis comes from a heavier stroke, not color
-      term: "#2b2b2b",
-      example: "#6b7280",
-      warning: "#c0392b", // the one red marker
+    roles: {
+      heading: { strokeColor: "#1F1F1F", strokeWidth: 2, fontFamily: 1, fontSize: 28 },
+      body: { strokeColor: "#1F1F1F", strokeWidth: 1, fontFamily: 1, fontSize: 20 },
+      nodePrimary: { strokeColor: "#1F1F1F", backgroundColor: "#E8590C", fillStyle: "hachure", strokeWidth: 2, fontFamily: 1, fontSize: 20, rounded: true },
+      nodeSecondary: { strokeColor: "#1F1F1F", backgroundColor: "transparent", strokeWidth: 1, fontFamily: 1, fontSize: 20, rounded: true },
+      connector: { strokeColor: "#1F1F1F", strokeWidth: 1, strokeStyle: "solid" },
+      frame: { strokeColor: "#1F1F1F", backgroundColor: "transparent", strokeWidth: 1, strokeStyle: "solid", rounded: true },
+      emphasis: { strokeColor: "#E8590C", strokeWidth: 2, fontFamily: 1, fontSize: 20 },
     },
-    keyStrokeWidth: 3.5,
-    normalStrokeWidth: 1.5,
-    connectorColor: "#2b2b2b",
-    groupTints: ["#fff7d6", "#e7f0ff", "#ffe9e3", "#e6f7ec"],
-    layout: { rankdir: "LR", nodesep: 75, ranksep: 120 },
   },
 };
 
-export const DEFAULT_KIT_ID = "duotone";
+export const DEFAULT_THEME_ID = "handwritten-notes";
 
-export function getKit(id?: string): ThemeKit {
-  return KITS[id ?? DEFAULT_KIT_ID] ?? KITS[DEFAULT_KIT_ID];
+export function getTheme(id?: string): Theme {
+  return THEMES[id ?? DEFAULT_THEME_ID] ?? THEMES[DEFAULT_THEME_ID];
 }

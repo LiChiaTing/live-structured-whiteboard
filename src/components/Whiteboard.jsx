@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Excalidraw, convertToExcalidrawElements } from "@excalidraw/excalidraw";
 import "@excalidraw/excalidraw/index.css";
 import { dslToSkeletons } from "../render.ts";
-import { getKit } from "../theme.ts";
+import { getTheme } from "../theme.ts";
 
 /**
  * Whiteboard — the canvas (React Island).
@@ -24,24 +24,35 @@ export default function Whiteboard() {
     //   window.drawDSL({ nodes: [...], edges: [...] })
     window.excalidrawAPI = excalidrawAPI;
     // window.drawDSL(dsl, "soft" | "neutral" | "vivid")
-    window.drawDSL = (input, kitId) => {
-      const kit = getKit(kitId);
+    // Excalidraw's fonts (Excalifont/Nunito/Comic Shanns) load on demand. If we
+    // convert+measure text before the needed font is ready, widths bake in wrong
+    // and labels clip. So preload all families/sizes, THEN paint.
+    const FONT_FAMILIES = ["Excalifont", "Nunito", "Comic Shanns"];
+    const FONT_SIZES = [16, 18, 20, 28, 36];
+    const preloadFonts = () =>
+      Promise.all(
+        FONT_FAMILIES.flatMap((f) => FONT_SIZES.map((s) => document.fonts.load(`${s}px ${f}`).catch(() => {}))),
+      ).then(() => document.fonts.ready);
+
+    window.drawDSL = (input, themeId) => {
+      const theme = getTheme(themeId);
       const paint = () => {
-        const elements = convertToExcalidrawElements(dslToSkeletons(input, kit));
+        const elements = convertToExcalidrawElements(dslToSkeletons(input, theme));
         excalidrawAPI.updateScene({
           elements,
-          appState: { viewBackgroundColor: kit.canvasBackground ?? "#ffffff" },
+          appState: { viewBackgroundColor: theme.pageBackground ?? "#ffffff" },
         });
         excalidrawAPI.scrollToContent(elements, { fitToContent: true });
-        return elements.length;
       };
-      // Wait for fonts before Excalidraw measures text — otherwise a hand-drawn
-      // label gets measured with a fallback font and clips on first render.
-      if (typeof document !== "undefined" && document.fonts?.status !== "loaded") {
-        document.fonts.ready.then(paint);
-        return 0;
-      }
-      return paint();
+      // Even after fonts.ready, the very first conversion that uses a font can
+      // measure text before the canvas has it active (widths bake in too small
+      // -> labels clip). Paint, then repaint once more so the second measure is
+      // correct. Cheap and idempotent.
+      preloadFonts().then(() => {
+        paint();
+        requestAnimationFrame(() => requestAnimationFrame(paint));
+      });
+      return "drawing (after fonts load)";
     };
   }, [excalidrawAPI]);
 
