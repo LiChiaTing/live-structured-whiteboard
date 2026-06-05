@@ -1,21 +1,23 @@
-# docs — 專案的思考文件
+# docs — Thinking Documents
 
-這個資料夾放「為什麼做、要做什麼、怎麼做、做過哪些決定」。程式碼放在 `../src/`。
+This folder holds the "why we're building it, what to build, how to build it, and what we've decided." Source code lives in `../src/`.
 
-## 結構
+> These product/planning documents are Dianne's source thinking and are intentionally written in **Chinese**. The code and collaboration layer (README, comments, commit messages, this index's prose) is in **English**.
 
-| 資料夾 | 放什麼 | 現有文件 |
+## Structure
+
+| Folder | What goes here | Files |
 |---|---|---|
-| `00-product/` | 產品的北極星:為什麼做、給誰用、體驗準則 | 產品概念與願景_Product_Spec.md、產品焦點與體驗準則.md |
-| `01-plan/` | 技術規格與實作藍圖、啟動指令 | 教學動態白板_開發計畫_v2.md、START_HERE_cursor_prompt.md |
-| `03-decisions/` | 重要決策記錄 (跨設計 / 工程共用) | decision-log.md |
-| `archive/` | 已被取代的舊版,僅存查、勿據以開發 | MVP開發計畫_v1_已被v2取代.md |
+| `00-product/` | Product north star: why we build it, who it's for, experience principles | 產品概念與願景_Product_Spec.md, 產品焦點與體驗準則.md |
+| `01-plan/` | Technical spec, implementation blueprint, start prompt | 教學動態白板_開發計畫_v2.md, START_HERE_cursor_prompt.md |
+| `03-decisions/` | Key decisions log (shared across design / engineering) | decision-log.md |
+| `archive/` | Superseded older versions — reference only, do not build from | MVP開發計畫_v1_已被v2取代.md |
 
-> 編號留有空檔 (例如 `02-` 給使用者研究) 是刻意的,之後的設計 / 研究流程會接著補進來。
+> The numbering leaves gaps on purpose (e.g. `02-` for user research) so later design / research work can slot in.
 
-## 從哪份開始讀
+## Where to start reading
 
-1. **`00-product/產品概念與願景_Product_Spec.md`** — 先懂「為什麼做」。
-2. **`00-product/產品焦點與體驗準則.md`** — 開發時拉回焦點的體驗準則 (含研究來源)。動手前、卡關時回來讀。
-3. **`01-plan/教學動態白板_開發計畫_v2.md`** — 再看「怎麼做」(現役技術藍圖)。
-4. **`01-plan/START_HERE_cursor_prompt.md`** — 給 Cursor / Claude Code 的逐步開發起手式。
+1. **`00-product/產品概念與願景_Product_Spec.md`** — understand "why" first.
+2. **`00-product/產品焦點與體驗準則.md`** — experience principles to stay focused during development (with research sources). Re-read before building and when stuck.
+3. **`01-plan/教學動態白板_開發計畫_v2.md`** — then "how" (the active technical blueprint).
+4. **`01-plan/START_HERE_cursor_prompt.md`** — step-by-step kickoff prompt for Cursor / Claude Code.

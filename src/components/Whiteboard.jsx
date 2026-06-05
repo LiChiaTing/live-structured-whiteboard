@@ -3,19 +3,20 @@ import { Excalidraw } from "@excalidraw/excalidraw";
 import "@excalidraw/excalidraw/index.css";
 
 /**
- * Whiteboard — 白板畫布 (React Island)。
+ * Whiteboard — the canvas (React Island).
  *
- * 步驟 1 的目標就只到「跑起一塊可互動的空白白板,並抓到 excalidrawAPI」。
- * 之後 (步驟 2+) 會用這個 api 呼叫 api.updateScene({ elements }),
- * 把渲染層 (render.ts) 算出來的 Excalidraw 元素畫上去。
+ * Step 1 only goes as far as "run an interactive blank whiteboard and capture
+ * the excalidrawAPI." Later (step 2+) we'll call api.updateScene({ elements })
+ * to draw the Excalidraw elements computed by the render layer (render.ts).
  *
- * 注意:這個元件一定要用 client:only="react" 嵌入,
- * 因為 Excalidraw 會存取 window / document,不能在伺服器端渲染。
+ * Note: this component must be embedded with client:only="react", because
+ * Excalidraw accesses window / document and cannot be server-rendered.
  */
 export default function Whiteboard() {
   const [excalidrawAPI, setExcalidrawAPI] = useState(null);
 
-  // 開發期方便:把 api 掛到 window,之後可在瀏覽器 console 手動測 updateScene。
+  // Dev convenience: expose the api on window so we can test updateScene
+  // manually from the browser console.
   useEffect(() => {
     if (excalidrawAPI) {
       window.excalidrawAPI = excalidrawAPI;
@@ -26,7 +27,8 @@ export default function Whiteboard() {
     <div style={{ height: "100%", width: "100%" }}>
       <Excalidraw
         excalidrawAPI={(api) => setExcalidrawAPI(api)}
-        // 極簡、低認知負荷:預設淺色主題,之後再依設計方向調整 UI。
+        // Minimal, low cognitive load: default light theme; refine the UI later
+        // per the design direction.
         theme="light"
       />
     </div>

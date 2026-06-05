@@ -13,8 +13,8 @@ import "../styles/global.css";
   </head>
   <body class="h-full">
     <!--
-      client:only="react" — Excalidraw 只在瀏覽器端渲染,不做伺服器端渲染。
-      白板需要一個有高度的容器才看得到 (這裡用 h-screen 撐滿視窗)。
+      client:only="react" — Excalidraw renders only in the browser, not on the server.
+      The whiteboard needs a container with height to be visible (h-screen fills the viewport).
     -->
     <main class="h-screen w-screen">
       <Whiteboard client:only="react" />
