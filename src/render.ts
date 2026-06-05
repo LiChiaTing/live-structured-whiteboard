@@ -1,9 +1,10 @@
 import dagre from "@dagrejs/dagre";
 import type { Edge, Node } from "./dsl";
+import { getKit, type ThemeKit } from "./theme";
 
 /**
  * render.ts — the deterministic render layer: DSL -> Excalidraw element
- * skeletons.
+ * skeletons, styled by a theme kit.
  *
  * This is a PURE function: same input always yields the same output, no
  * network, no DOM. That's what makes it unit-testable.
@@ -16,21 +17,17 @@ import type { Edge, Node } from "./dsl";
  * (so tests would break). Skeletons keep the engine pure and testable; the
  * actual rendering is verified in the browser.
  *
- * Responsibilities:
- *  1. Use dagre to compute each node's x/y so nothing overlaps.
- *  2. Map each DSL shape to an Excalidraw element type, with emphasis styling.
- *  3. Turn edges into arrows/lines bound to their from/to nodes by id.
+ * Styling is NOT hardcoded — it comes from the chosen kit (theme.ts):
+ *   - role  -> color   (kit.roleColors[node.role])
+ *   - "key" -> heavier stroke
+ *   - kit.lineStyle -> roughness (hand vs clean)
+ *   - group -> a soft tint cycled from kit.groupTints
  */
 
-// --- Low-key visual defaults (baseline; tune after seeing it rendered) ---
-const STROKE_NORMAL = "#1e1e1e";
-const STROKE_STRONG = "#1971c2";
-const STROKE_WIDTH_NORMAL = 1;
-const STROKE_WIDTH_STRONG = 2;
-const NODE_FONT_SIZE = 20;
+const FONT_SIZE = 20;
 const EDGE_FONT_SIZE = 16;
 
-// --- Layout tuning ---
+// --- Layout sizing ---
 const NODE_HEIGHT = 70;
 const LABEL_PADDING_X = 48; // horizontal breathing room around the label text
 const MIN_NODE_WIDTH = 90;
@@ -52,16 +49,29 @@ export type RenderInput = { nodes: Node[]; edges: Edge[] };
  * we approximate from character count — good enough for non-overlapping layout
  * (Excalidraw re-measures text precisely when it renders).
  */
-function estimateNodeSize(node: Node): { width: number; height: number } {
-  const avgCharWidth = NODE_FONT_SIZE * 0.62;
+function estimateNodeSize(node: Node, fontFamily: 1 | 2 | 3): { width: number; height: number } {
+  // The hand-drawn font (Virgil, family 1) is noticeably wider than Helvetica,
+  // so it needs a larger per-char estimate or labels clip inside their boxes.
+  const charWidthFactor = fontFamily === 1 ? 0.82 : 0.62;
+  const avgCharWidth = FONT_SIZE * charWidthFactor;
   const textWidth = Math.max(node.label.length, 1) * avgCharWidth;
 
   if (node.shape === "text") {
-    return { width: Math.max(Math.ceil(textWidth), MIN_NODE_WIDTH), height: Math.ceil(NODE_FONT_SIZE * 1.4) };
+    return { width: Math.max(Math.ceil(textWidth), MIN_NODE_WIDTH), height: Math.ceil(FONT_SIZE * 1.4) };
   }
 
   let width = Math.max(Math.ceil(textWidth + LABEL_PADDING_X), MIN_NODE_WIDTH);
   let height = NODE_HEIGHT;
+
+  // Text inscribed in an ellipse/diamond needs a bigger box than in a rectangle
+  // (the shape narrows away from the center), or the label clips.
+  if (node.shape === "ellipse" || node.shape === "circle") {
+    width = Math.ceil(width * 1.55);
+    height = 96;
+  } else if (node.shape === "diamond") {
+    width = Math.ceil(width * 1.6);
+    height = 100;
+  }
   if (node.shape === "circle") {
     const diameter = Math.max(width, height); // a circle's bounding box is square
     width = diameter;
@@ -94,21 +104,21 @@ function validEdges(nodes: Node[], edges: Edge[]): Edge[] {
 }
 
 /**
- * Compute each node's bounding box via dagre. Returns top-left x/y (Excalidraw
- * coordinates) plus width/height. Exposed separately so layout invariants
- * (e.g. no overlap) can be unit-tested directly.
+ * Compute each node's bounding box via dagre, using the kit's layout settings.
+ * Returns top-left x/y (Excalidraw coordinates) plus width/height. Exposed
+ * separately so layout invariants (e.g. no overlap) can be unit-tested.
  */
-export function computeLayout(input: RenderInput): Map<string, Box> {
+export function computeLayout(input: RenderInput, kit: ThemeKit = getKit()): Map<string, Box> {
   const { nodes } = input;
   const edges = validEdges(nodes, input.edges);
 
   const g = new dagre.graphlib.Graph({ compound: true });
-  g.setGraph({ rankdir: "LR", nodesep: 60, ranksep: 90, marginx: 40, marginy: 40 });
+  g.setGraph({ ...kit.layout, marginx: 40, marginy: 40 });
   g.setDefaultEdgeLabel(() => ({}));
 
   const sizes = new Map<string, { width: number; height: number }>();
   for (const n of nodes) {
-    const size = estimateNodeSize(n);
+    const size = estimateNodeSize(n, kit.fontFamily);
     sizes.set(n.id, size);
     g.setNode(n.id, { ...size });
   }
@@ -134,23 +144,34 @@ export function computeLayout(input: RenderInput): Map<string, Box> {
   return boxes;
 }
 
+/** Stable index per distinct group (order of first appearance) for tint cycling. */
+function groupIndexMap(nodes: Node[]): Map<string, number> {
+  const map = new Map<string, number>();
+  for (const n of nodes) {
+    if (n.group && !map.has(n.group)) map.set(n.group, map.size);
+  }
+  return map;
+}
+
 /**
- * Build Excalidraw element skeletons from a DSL set of nodes + edges.
- * Feed the result to `convertToExcalidrawElements` in the browser, then to
- * `excalidrawAPI.updateScene({ elements })`.
+ * Build Excalidraw element skeletons from a DSL set of nodes + edges, styled
+ * by `kit`. Feed the result to `convertToExcalidrawElements` in the browser,
+ * then to `excalidrawAPI.updateScene({ elements })`.
  */
-export function dslToSkeletons(input: RenderInput): Skeleton[] {
+export function dslToSkeletons(input: RenderInput, kit: ThemeKit = getKit()): Skeleton[] {
   const { nodes } = input;
   const edges = validEdges(nodes, input.edges);
-  const boxes = computeLayout(input);
+  const boxes = computeLayout(input, kit);
+  const groupIdx = groupIndexMap(nodes);
+  const roughness = kit.roughness;
 
   const skeletons: Skeleton[] = [];
 
   for (const n of nodes) {
     const box = boxes.get(n.id)!;
-    const strong = n.emphasis === "strong";
-    const strokeColor = strong ? STROKE_STRONG : STROKE_NORMAL;
-    const strokeWidth = strong ? STROKE_WIDTH_STRONG : STROKE_WIDTH_NORMAL;
+    const isKey = n.role === "key";
+    const strokeColor = kit.roleColors[n.role];
+    const strokeWidth = isKey ? kit.keyStrokeWidth : kit.normalStrokeWidth;
     const type = SHAPE_TO_TYPE[n.shape];
 
     if (type === "text") {
@@ -160,10 +181,12 @@ export function dslToSkeletons(input: RenderInput): Skeleton[] {
         x: box.x,
         y: box.y,
         text: n.label,
-        fontSize: NODE_FONT_SIZE,
+        fontSize: FONT_SIZE,
+        fontFamily: kit.fontFamily,
         strokeColor,
       });
     } else {
+      const tint = n.group ? kit.groupTints[(groupIdx.get(n.group) ?? 0) % kit.groupTints.length] : "transparent";
       skeletons.push({
         type,
         id: n.id,
@@ -173,8 +196,10 @@ export function dslToSkeletons(input: RenderInput): Skeleton[] {
         height: box.height,
         strokeColor,
         strokeWidth,
-        backgroundColor: "transparent",
-        label: { text: n.label, fontSize: NODE_FONT_SIZE, strokeColor },
+        roughness,
+        backgroundColor: tint,
+        fillStyle: kit.fillStyle,
+        label: { text: n.label, fontSize: FONT_SIZE, fontFamily: kit.fontFamily, strokeColor },
       });
     }
   }
@@ -199,10 +224,11 @@ export function dslToSkeletons(input: RenderInput): Skeleton[] {
       ],
       start: { id: e.from },
       end: { id: e.to },
-      strokeColor: STROKE_NORMAL,
-      strokeWidth: STROKE_WIDTH_NORMAL,
+      strokeColor: kit.connectorColor,
+      strokeWidth: kit.normalStrokeWidth,
+      roughness,
     };
-    if (e.label) skeleton.label = { text: e.label, fontSize: EDGE_FONT_SIZE };
+    if (e.label) skeleton.label = { text: e.label, fontSize: EDGE_FONT_SIZE, fontFamily: kit.fontFamily };
     skeletons.push(skeleton);
   }
 

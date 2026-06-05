@@ -13,12 +13,21 @@ import { z } from "zod";
  * send unvalidated data to the render layer.
  */
 
+/**
+ * Content role — what a node MEANS. This is the LLM's semantic vocabulary; the
+ * chosen theme kit maps each role to a consistent color (see theme.ts), so
+ * color carries meaning instead of being decoration. Shape (below) is separate
+ * — it controls form, not meaning.
+ */
+export const RoleSchema = z.enum(["concept", "key", "term", "example", "warning"]);
+export type Role = z.infer<typeof RoleSchema>;
+
 export const NodeSchema = z.object({
   id: z.string(), // stable unique id, named by the LLM (e.g. "sun", "plant")
   label: z.string(), // text shown on the node
   shape: z.enum(["circle", "rect", "diamond", "text", "ellipse"]),
   group: z.string().optional(), // nodes in the same group are clustered together
-  emphasis: z.enum(["normal", "strong"]).default("normal"),
+  role: RoleSchema.default("concept"), // meaning -> color, via the theme kit
 });
 
 export const EdgeSchema = z.object({

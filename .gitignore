@@ -22,6 +22,9 @@ Thumbs.db
 .playwright-mcp/
 /*.png
 
+# Preview folder — visuals I open for Dianne to review; never committed
+_preview/
+
 # SpecStory auto-save (Cursor history, not source)
 .specstory/
 
