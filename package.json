@@ -7,10 +7,13 @@
     "dev": "astro dev",
     "build": "astro build",
     "preview": "astro preview",
-    "astro": "astro"
+    "astro": "astro",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@astrojs/react": "^4.2.0",
+    "@dagrejs/dagre": "^3.0.0",
     "@excalidraw/excalidraw": "^0.18.0",
     "@tailwindcss/vite": "^4.0.0",
     "astro": "^5.2.0",
@@ -20,6 +23,7 @@
   },
   "devDependencies": {
     "@types/react": "^19.0.0",
-    "@types/react-dom": "^19.0.0"
+    "@types/react-dom": "^19.0.0",
+    "vitest": "^4.1.8"
   }
 }

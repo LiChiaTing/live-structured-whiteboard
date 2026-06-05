@@ -1,13 +1,15 @@
 import { useEffect, useState } from "react";
-import { Excalidraw } from "@excalidraw/excalidraw";
+import { Excalidraw, convertToExcalidrawElements } from "@excalidraw/excalidraw";
 import "@excalidraw/excalidraw/index.css";
+import { dslToSkeletons } from "../render.ts";
 
 /**
  * Whiteboard — the canvas (React Island).
  *
- * Step 1 only goes as far as "run an interactive blank whiteboard and capture
- * the excalidrawAPI." Later (step 2+) we'll call api.updateScene({ elements })
- * to draw the Excalidraw elements computed by the render layer (render.ts).
+ * Pipeline (step 2): DSL ({ nodes, edges })
+ *   -> dslToSkeletons()            (pure, in render.ts)
+ *   -> convertToExcalidrawElements (Excalidraw fills every field + binds arrows)
+ *   -> excalidrawAPI.updateScene   (draws it)
  *
  * Note: this component must be embedded with client:only="react", because
  * Excalidraw accesses window / document and cannot be server-rendered.
@@ -15,12 +17,17 @@ import "@excalidraw/excalidraw/index.css";
 export default function Whiteboard() {
   const [excalidrawAPI, setExcalidrawAPI] = useState(null);
 
-  // Dev convenience: expose the api on window so we can test updateScene
-  // manually from the browser console.
   useEffect(() => {
-    if (excalidrawAPI) {
-      window.excalidrawAPI = excalidrawAPI;
-    }
+    if (!excalidrawAPI) return;
+    // Dev convenience: draw a DSL board straight from the console / tests.
+    //   window.drawDSL({ nodes: [...], edges: [...] })
+    window.excalidrawAPI = excalidrawAPI;
+    window.drawDSL = (input) => {
+      const elements = convertToExcalidrawElements(dslToSkeletons(input));
+      excalidrawAPI.updateScene({ elements });
+      excalidrawAPI.scrollToContent(elements, { fitToContent: true });
+      return elements.length;
+    };
   }, [excalidrawAPI]);
 
   return (
