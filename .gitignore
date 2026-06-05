@@ -29,3 +29,6 @@ whiteboard-smoketest.png
 # Personal drafts (case study etc. — keep out of the public repo)
 CASE_STUDY*
 _to-delete/
+
+# Local-only Chinese originals of the thinking docs (English versions live in the repo)
+docs/_zh-originals/

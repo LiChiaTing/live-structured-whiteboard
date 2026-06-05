@@ -1,10 +1,16 @@
-# Teaching Live Whiteboard (教學動態白板)
+# Live Structured Whiteboard
 
-Turns lecture content into a clean, minimal, structured whiteboard (text boxes, arrows, simple shapes) in real time, and automatically produces tidy notes after class.
+Turns what's being said in any live session — lectures, meetings, brainstorming — into a clean, minimal, structured whiteboard (text boxes, arrows, simple shapes) in real time, and automatically produces tidy notes afterward.
 
 ## What it is
 
-A live whiteboard for educators. As the teacher speaks, the system translates spoken content into clear, low-cognitive-load whiteboard visuals that help visual learners follow along, and delivers clean notes to students after class.
+A live whiteboard for any session where people think out loud together. As someone speaks, the system translates the spoken content into clear, low-cognitive-load whiteboard visuals that help visual thinkers follow along, and delivers clean notes to participants afterward.
+
+It fits any scenario with the same shape — someone is talking and ideas need visible structure:
+
+- **Classroom / lectures** — clean board work grows alongside the talk.
+- **Meetings** — points, decisions, and dependencies become one shared structured picture.
+- **Brainstorming** — ideas and their relationships surface as a living map.
 
 **MVP scope:** start with the "paste transcript / type → generate whiteboard → export notes" pipeline. Voice is a later input layer, not the first thing to solve.
 
@@ -15,7 +21,7 @@ A live whiteboard for educators. As the teacher speaks, the system translates sp
 3. The whiteboard is cumulative (add / connect / update / remove), not redrawn from scratch each time.
 4. Every LLM output passes Zod validation first; on failure it is retried or discarded, and never sent to the render layer.
 
-Full spec (in Chinese): [docs/01-plan/教學動態白板_開發計畫_v2.md](docs/01-plan/教學動態白板_開發計畫_v2.md).
+Full spec: [docs/01-plan/dev-plan-v2.md](docs/01-plan/dev-plan-v2.md).
 
 ## Tech stack
 
@@ -31,9 +37,9 @@ Full spec (in Chinese): [docs/01-plan/教學動態白板_開發計畫_v2.md](doc
 
 ```
 .
-├── docs/                  Thinking documents (in Chinese — Dianne's source docs)
+├── docs/                  Thinking documents
 │   ├── 00-product/        Product vision + experience principles (north star: why)
-│   ├── 01-plan/           Dev plan v2 + Cursor / Claude Code start prompt
+│   ├── 01-plan/           Dev plan v2 + start-here kickoff prompt
 │   ├── 03-decisions/      decision-log (key decisions)
 │   └── archive/           Superseded older versions (reference only)
 ├── src/                   Source code
@@ -45,8 +51,6 @@ Full spec (in Chinese): [docs/01-plan/教學動態白板_開發計畫_v2.md](doc
 ├── README.md             This file
 └── CLAUDE.md             Project guide for AI agents
 ```
-
-> The `docs/` folder holds Dianne's product and planning documents, which are written in Chinese on purpose. Everything in the code and collaboration layer is in English.
 
 ## How to run
 
