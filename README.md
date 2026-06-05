@@ -32,19 +32,31 @@
 ```
 .
 ├── docs/                  專案的「思考」文件
-│   ├── 00-product/        產品概念與願景 (北極星:為什麼做)
+│   ├── 00-product/        產品概念與願景 + 體驗準則 (北極星:為什麼做)
 │   ├── 01-plan/           開發計畫 v2 + Cursor / Claude Code 啟動指令
 │   ├── 03-decisions/      decision-log (重要決策記錄)
 │   └── archive/           已被取代的舊版 (僅存查)
-├── src/                   程式碼 (Astro 進駐後在此)
+├── src/                   程式碼
+│   ├── pages/             Astro 頁面 (index.astro)
+│   ├── components/        React 元件 (Whiteboard.jsx — Excalidraw island)
+│   └── styles/            global.css (Tailwind)
+├── public/                靜態資源 (favicon)
+├── astro.config.mjs       Astro 設定 (React + Tailwind)
 ├── README.md             你正在看的這份
 └── CLAUDE.md             給 AI agent 的專案說明
 ```
 
 ## How to run
 
-> 程式碼尚未進駐 — 目前是規劃 / 地基階段。
-> 開始開發後,啟動指令會補在這裡 (預期為 `npm install` → `npm run dev`)。
+```bash
+npm install      # 安裝套件 (第一次)
+npm run dev      # 本地開發,開 http://localhost:4321/
+npm run build    # 產生正式版到 dist/
+npm run preview  # 預覽 build 後的結果
+```
+
+目前狀態:**步驟 1 完成** — Astro + Tailwind + Excalidraw 白板已可跑、可互動,並接好 `excalidrawAPI`。
+下一步是 `src/dsl.ts` + `src/render.ts`(DSL → Excalidraw)+ 單元測試。
 
 ## Credits
 

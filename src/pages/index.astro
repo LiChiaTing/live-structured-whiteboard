@@ -1,0 +1,23 @@
+---
+import Whiteboard from "../components/Whiteboard.jsx";
+import "../styles/global.css";
+---
+
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>教學動態白板</title>
+  </head>
+  <body class="h-full">
+    <!--
+      client:only="react" — Excalidraw 只在瀏覽器端渲染,不做伺服器端渲染。
+      白板需要一個有高度的容器才看得到 (這裡用 h-screen 撐滿視窗)。
+    -->
+    <main class="h-screen w-screen">
+      <Whiteboard client:only="react" />
+    </main>
+  </body>
+</html>

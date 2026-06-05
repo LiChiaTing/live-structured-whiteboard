@@ -18,6 +18,11 @@ dist/
 Thumbs.db
 *.log
 
+# Browser test artifacts (Playwright screenshots / logs)
+.playwright-mcp/
+whiteboard-step1.png
+whiteboard-smoketest.png
+
 # SpecStory auto-save (Cursor history, not source)
 .specstory/
 

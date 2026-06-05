@@ -1,0 +1,8 @@
+@import "tailwindcss";
+
+/* 讓白板能撐滿整個視窗 — Excalidraw 會填滿父層的寬高,父層沒高度就看不到畫布。 */
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
