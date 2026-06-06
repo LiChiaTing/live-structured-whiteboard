@@ -1,5 +1,5 @@
 import dagre from "@dagrejs/dagre";
-import type { Edge, Node } from "./dsl";
+import type { Edge, LLMOutput, Node } from "./dsl";
 import { getTheme, type RoleStyle, type Theme } from "./theme";
 
 /**
@@ -34,6 +34,25 @@ const SHAPE_TO_TYPE = {
 export type Box = { x: number; y: number; width: number; height: number };
 export type Skeleton = Record<string, unknown> & { type: string };
 export type RenderInput = { nodes: Node[]; edges: Edge[] };
+
+/**
+ * Flatten validated LLM ops into the current board (nodes + edges) for
+ * rendering. MVP cumulative handling: add/connect/update merge nodes by id
+ * (last wins) and append edges; remove drops nodes by id.
+ */
+export function opsToRenderInput(out: LLMOutput): RenderInput {
+  const nodes = new Map<string, Node>();
+  const edges: Edge[] = [];
+  for (const op of out.ops) {
+    if (op.op === "remove") {
+      for (const id of op.removeIds) nodes.delete(id);
+      continue;
+    }
+    for (const n of op.nodes) nodes.set(n.id, n);
+    for (const e of op.edges) edges.push(e);
+  }
+  return { nodes: [...nodes.values()], edges };
+}
 
 function roleOf(theme: Theme, node: Node): RoleStyle {
   return theme.roles[node.role];

@@ -1,5 +1,5 @@
 ---
-import Whiteboard from "../components/Whiteboard.jsx";
+import Studio from "../components/Studio.jsx";
 import "../styles/global.css";
 ---
 
@@ -12,12 +12,9 @@ import "../styles/global.css";
     <title>Live Structured Whiteboard</title>
   </head>
   <body class="h-full">
-    <!--
-      client:only="react" — Excalidraw renders only in the browser, not on the server.
-      The whiteboard needs a container with height to be visible (h-screen fills the viewport).
-    -->
+    <!-- client:only="react" — the board + Excalidraw render only in the browser. -->
     <main class="h-screen w-screen">
-      <Whiteboard client:only="react" />
+      <Studio client:only="react" />
     </main>
   </body>
 </html>

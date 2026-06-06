@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { NodeSchema, EdgeSchema, parseLLMOutput } from "./dsl";
-import { computeLayout, dslToSkeletons, type Box, type RenderInput } from "./render";
+import { computeLayout, dslToSkeletons, opsToRenderInput, type Box, type RenderInput } from "./render";
 import { THEMES, getTheme } from "./theme";
+import { mockGenerate, EXAMPLES } from "./lib/mock-llm";
 
 /**
  * Step 2 acceptance: given fixed DSL, the engine produces valid output, no
@@ -207,5 +208,53 @@ describe("dsl validation gate", () => {
       ops: [{ op: "add", nodes: [{ id: "x", label: "X", shape: "rect", role: "headline" }] }],
     });
     expect(out).toBeNull();
+  });
+});
+
+describe("opsToRenderInput — flatten ops to a board", () => {
+  it("merges nodes (by id) and appends edges across ops", () => {
+    const out = parseLLMOutput({
+      ops: [
+        { op: "add", nodes: [{ id: "a", label: "A", shape: "rect" }], edges: [] },
+        { op: "connect", nodes: [{ id: "b", label: "B", shape: "rect" }], edges: [{ from: "a", to: "b" }] },
+      ],
+    })!;
+    const input = opsToRenderInput(out);
+    expect(input.nodes.map((n) => n.id).sort()).toEqual(["a", "b"]);
+    expect(input.edges).toHaveLength(1);
+  });
+
+  it("removes nodes named in a remove op", () => {
+    const out = parseLLMOutput({
+      ops: [
+        { op: "add", nodes: [{ id: "a", label: "A", shape: "rect" }, { id: "b", label: "B", shape: "rect" }] },
+        { op: "remove", removeIds: ["a"] },
+      ],
+    })!;
+    expect(opsToRenderInput(out).nodes.map((n) => n.id)).toEqual(["b"]);
+  });
+});
+
+describe("step 3 pipeline — mock LLM through the gate and into skeletons", () => {
+  it("every example transcript yields valid, renderable output", () => {
+    for (const ex of EXAMPLES) {
+      const out = parseLLMOutput(mockGenerate(ex.transcript));
+      expect(out, ex.label).not.toBeNull();
+      const sk = dslToSkeletons(opsToRenderInput(out!));
+      expect(sk.length, ex.label).toBeGreaterThan(0);
+    }
+  });
+
+  it("free-text falls back to a chained list (first line is the heading)", () => {
+    const out = parseLLMOutput(mockGenerate("First line\nSecond line\nThird line"))!;
+    const input = opsToRenderInput(out);
+    expect(input.nodes).toHaveLength(3);
+    expect(input.nodes[0].role).toBe("heading");
+    expect(input.edges).toHaveLength(2); // chained
+  });
+
+  it("empty input produces no ops (nothing to draw)", () => {
+    const out = parseLLMOutput(mockGenerate("   \n  "))!;
+    expect(opsToRenderInput(out).nodes).toHaveLength(0);
   });
 });
