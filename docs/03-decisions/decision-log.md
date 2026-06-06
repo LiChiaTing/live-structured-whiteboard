@@ -4,6 +4,12 @@ Records the project's key decisions and the "why." Newest on top. Shared by desi
 
 ---
 
+## 2026-06-05 — Roadmap: richer visual representations (not just box-arrow flowcharts)
+
+- **Direction (later, after the step 3 text→board pipeline works):** Make fuller use of Excalidraw's toolset so the board isn't always a node-link flowchart. Two layers: (A) richer elements/annotations the theme can use — curved/elbow arrows, arrowhead variants, circling/underline/bracket callouts, translucent highlights, embedded icons; (B) different representation types chosen by content — 2×2 matrix, comparison columns/table, timeline, mind map (radial), tree, cycle, Venn/nesting.
+- **How it fits:** add a `representation` concept to the DSL (the AI says "this is a comparison / a cycle / a timeline") and matching layout strategies in render.ts (today only dagre flow exists). The theme layer is unchanged — any representation can wear any of the 4 presets.
+- **Why:** moves the product from "draws flowcharts" to "picks the right visual for the content," which is closer to the north star and to how a real teacher/facilitator varies their board work.
+
 ## 2026-06-05 — Scope broadened beyond teaching; repo goes fully English + renamed
 
 - **Decision:** The product is not teaching-only. The same mechanic (speech/text → structured board → notes) also serves **meetings** and **brainstorming sessions**, so the positioning is "a live structured whiteboard for any live session." Renamed the repo `teaching-live-whiteboard` → `live-structured-whiteboard` to match.
