@@ -1,20 +1,21 @@
-import Anthropic from "@anthropic-ai/sdk";
-import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
-import { LLMOutputSchema, type LLMOutput } from "../dsl";
+import { parseLLMOutput, type LLMOutput } from "../dsl";
+import { envVar } from "./env";
+import { generateWithClaude } from "./providers/claude";
+import { generateWithGemini } from "./providers/gemini";
 
 /**
- * llm.ts — the real model call (step 4): transcript -> validated DSL.
+ * llm.ts — transcript -> validated DSL, provider-agnostic.
  *
- * Uses Claude with structured outputs (output_config.format) so the response is
- * forced to match our schema, then validates with Zod (LLMOutputSchema) as the
- * gate. The endpoint (src/pages/api/generate.ts) and the eval harness both call
- * generateDSL — the API key stays server-side and never reaches the browser.
+ * Picks a provider (Gemini = free tier, or Claude = paid), calls it, then runs
+ * the result through the Zod gate (parseLLMOutput) — the single place that
+ * guarantees valid DSL before anything downstream renders it. Both providers
+ * run server-side; the API key never reaches the browser.
+ *
+ * Pick the provider with the LLM_PROVIDER env var ("gemini" | "claude").
+ * If unset, prefer whichever key is present (Gemini first, since it's free).
  */
 
-// Sonnet 4.6 — the balance of quality and cost for this extraction task.
-const MODEL = "claude-sonnet-4-6";
-
-const SYSTEM_PROMPT = `You turn a transcript or set of notes into a compact whiteboard structure (a "DSL"). You describe MEANING only — never positions, colors, or sizes (a layout engine and theme handle the look).
+export const SYSTEM_PROMPT = `You turn a transcript or set of notes into a compact whiteboard structure (a "DSL"). You describe MEANING only — never positions, colors, or sizes (a layout engine and theme handle the look).
 
 Output a set of nodes and edges wrapped in a single op with "op": "add".
 
@@ -43,42 +44,28 @@ PRINCIPLES (important — this is a low-cognitive-load whiteboard, not a transcr
 - Keep labels short. Do not invent content that isn't in the transcript.
 - noteHint: one plain-text sentence summarizing the board, for post-session notes.`;
 
-function getApiKey(): string {
-  // Works in both Astro (server) and Vitest — both are Vite-based.
-  const key =
-    (typeof import.meta !== "undefined" && (import.meta as any).env?.ANTHROPIC_API_KEY) ||
-    (typeof process !== "undefined" && process.env?.ANTHROPIC_API_KEY);
-  if (!key) {
-    throw new Error("Missing ANTHROPIC_API_KEY. Add it to your .env file.");
-  }
-  return key;
+export type Provider = "gemini" | "claude";
+
+export function activeProvider(): Provider {
+  const p = (envVar("LLM_PROVIDER") || "").toLowerCase();
+  if (p === "claude" || p === "anthropic") return "claude";
+  if (p === "gemini" || p === "google") return "gemini";
+  // No explicit choice: prefer whichever key exists, Gemini first (it's free).
+  if (envVar("GEMINI_API_KEY")) return "gemini";
+  if (envVar("ANTHROPIC_API_KEY")) return "claude";
+  return "gemini";
 }
 
-/**
- * Generate a validated DSL from a transcript. Throws on a missing key, an API
- * error, or output that fails the schema gate.
- */
+/** Generate a validated DSL from a transcript. Throws on missing key, API error,
+ *  or output that fails the schema gate. */
 export async function generateDSL(transcript: string): Promise<LLMOutput> {
-  const client = new Anthropic({ apiKey: getApiKey() });
+  const provider = activeProvider();
+  const raw =
+    provider === "claude"
+      ? await generateWithClaude(transcript, SYSTEM_PROMPT)
+      : await generateWithGemini(transcript, SYSTEM_PROMPT);
 
-  const message = await client.messages.parse({
-    model: MODEL,
-    max_tokens: 4096,
-    thinking: { type: "disabled" }, // fast, interactive — the prompt + schema do the work
-    system: SYSTEM_PROMPT,
-    messages: [
-      {
-        role: "user",
-        content: `Turn this into a whiteboard structure:\n\n"""\n${transcript.trim()}\n"""`,
-      },
-    ],
-    output_config: { format: zodOutputFormat(LLMOutputSchema) },
-  });
-
-  const parsed = message.parsed_output;
-  if (!parsed) {
-    // refusal, max_tokens, or schema mismatch — never send unvalidated data on.
-    throw new Error(`Model did not return valid DSL (stop_reason: ${message.stop_reason}).`);
-  }
-  return parsed;
+  const out = parseLLMOutput(raw); // the single validation gate
+  if (!out) throw new Error("Model output failed schema validation.");
+  return out;
 }

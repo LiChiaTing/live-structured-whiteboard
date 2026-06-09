@@ -13,7 +13,9 @@ import { EVAL_SET } from "./eval-set";
  * score so we can track the "structure correctness" target (>= 80%) over time.
  */
 
-const ENABLED = Boolean(process.env.RUN_EVAL && process.env.ANTHROPIC_API_KEY);
+const ENABLED = Boolean(
+  process.env.RUN_EVAL && (process.env.GEMINI_API_KEY || process.env.ANTHROPIC_API_KEY),
+);
 
 describe.skipIf(!ENABLED)("LLM eval — transcript -> DSL structure", () => {
   for (const c of EVAL_SET) {
