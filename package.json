@@ -10,7 +10,7 @@
     "astro": "astro",
     "test": "vitest run",
     "test:watch": "vitest",
-    "eval": "RUN_EVAL=1 vitest run src/eval/eval.test.ts"
+    "eval": "RUN_EVAL=1 GEMINI_MODEL=gemini-2.0-flash vitest run src/eval/eval.test.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.104.0",

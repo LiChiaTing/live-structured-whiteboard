@@ -8,8 +8,10 @@ import { envVar } from "../env";
  * (parseLLMOutput). We use responseJsonSchema to force JSON shaped like our DSL.
  */
 
-// gemini-2.5-flash is available on the free tier and is fast/capable enough here.
-const MODEL = "gemini-2.5-flash";
+// gemini-2.5-flash is available on the free tier and is fast/capable enough.
+// Overridable via GEMINI_MODEL (e.g. the eval uses gemini-2.0-flash, which has
+// a separate, higher free-tier rate limit).
+const MODEL = envVar("GEMINI_MODEL") || "gemini-2.5-flash";
 
 // Hand-written JSON schema in Gemini's supported subset (type/enum/items/
 // properties/required) — mirrors LLMOutputSchema. The Zod gate fills any
@@ -58,6 +60,20 @@ const RESPONSE_SCHEMA = {
   required: ["ops"],
 } as const;
 
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/** Pull the server-suggested retry delay (e.g. "17.6s") out of an error, in ms. */
+function retryDelayMs(err: unknown): number | null {
+  const msg = err instanceof Error ? err.message : String(err);
+  const m = /retry(?:Delay|\s+in)[":\s]+([\d.]+)s/i.exec(msg);
+  return m ? Math.ceil(parseFloat(m[1]) * 1000) : null;
+}
+
+function isRetryable(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return /\b(429|503)\b|RESOURCE_EXHAUSTED|UNAVAILABLE|high demand/i.test(msg);
+}
+
 export async function generateWithGemini(transcript: string, system: string): Promise<unknown> {
   const apiKey = envVar("GEMINI_API_KEY");
   if (!apiKey) {
@@ -65,7 +81,7 @@ export async function generateWithGemini(transcript: string, system: string): Pr
   }
 
   const ai = new GoogleGenAI({ apiKey });
-  const response = await ai.models.generateContent({
+  const params = {
     model: MODEL,
     contents: `Turn this into a whiteboard structure:\n\n"""\n${transcript.trim()}\n"""`,
     config: {
@@ -73,13 +89,36 @@ export async function generateWithGemini(transcript: string, system: string): Pr
       responseMimeType: "application/json",
       responseJsonSchema: RESPONSE_SCHEMA,
     },
-  });
+  };
 
-  const text = response.text;
-  if (!text) throw new Error("Gemini returned an empty response.");
-  try {
-    return JSON.parse(text);
-  } catch {
-    throw new Error("Gemini returned output that wasn't valid JSON.");
+  // The free tier is rate-limited (5 req/min). Retry on 429/503, waiting the
+  // server-suggested delay, so transient limits self-heal instead of failing.
+  const MAX_RETRIES = 4;
+  let lastErr: unknown;
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const response = await ai.models.generateContent(params);
+      const text = response.text;
+      if (!text) throw new Error("Gemini returned an empty response.");
+      try {
+        return JSON.parse(text);
+      } catch {
+        throw new Error("Gemini returned output that wasn't valid JSON.");
+      }
+    } catch (err) {
+      lastErr = err;
+      if (!isRetryable(err) || attempt === MAX_RETRIES) break;
+      const wait = Math.min(retryDelayMs(err) ?? 4000 * 2 ** attempt, 30000) + 500;
+      await sleep(wait);
+    }
   }
+
+  const msg = lastErr instanceof Error ? lastErr.message : String(lastErr);
+  if (/429|RESOURCE_EXHAUSTED/i.test(msg)) {
+    throw new Error("Gemini free-tier limit reached (5 requests/minute). Wait a minute and try again.");
+  }
+  if (/503|UNAVAILABLE|high demand/i.test(msg)) {
+    throw new Error("Gemini is busy right now. Please try again in a moment.");
+  }
+  throw lastErr instanceof Error ? lastErr : new Error("Gemini request failed.");
 }
