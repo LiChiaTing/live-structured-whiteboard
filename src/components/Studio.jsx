@@ -1,10 +1,20 @@
 import { useEffect, useState } from "react";
-import { Excalidraw, convertToExcalidrawElements } from "@excalidraw/excalidraw";
+import { Excalidraw, convertToExcalidrawElements, exportToBlob, exportToSvg } from "@excalidraw/excalidraw";
 import "@excalidraw/excalidraw/index.css";
 import { dslToSkeletons, opsToRenderInput } from "../render.ts";
 import { getTheme, THEMES, DEFAULT_THEME_ID } from "../theme.ts";
 import { parseLLMOutput } from "../dsl.ts";
+import { boardToMarkdown } from "../lib/notes.ts";
 import { EXAMPLES } from "../lib/mock-llm.ts";
+
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
 
 /**
  * Studio — step 4 UI: a control panel beside the board.
@@ -76,6 +86,31 @@ export default function Studio() {
     }
   };
 
+  // --- Export (all client-side, free) ---
+  const exportScene = () => ({
+    elements: api.getSceneElements(),
+    appState: { ...api.getAppState(), exportBackground: true },
+    files: api.getFiles(),
+  });
+
+  const exportPng = async () => {
+    if (!api) return;
+    const blob = await exportToBlob({ ...exportScene(), mimeType: "image/png", quality: 1 });
+    downloadBlob(blob, "whiteboard.png");
+  };
+
+  const exportSvg = async () => {
+    if (!api) return;
+    const svg = await exportToSvg(exportScene());
+    const text = new XMLSerializer().serializeToString(svg);
+    downloadBlob(new Blob([text], { type: "image/svg+xml" }), "whiteboard.svg");
+  };
+
+  const exportNotes = () => {
+    if (!output) return;
+    downloadBlob(new Blob([boardToMarkdown(output)], { type: "text/markdown" }), "notes.md");
+  };
+
   return (
     <div style={{ display: "flex", height: "100%", width: "100%" }}>
       <aside className="flex w-80 shrink-0 flex-col gap-4 overflow-y-auto border-r border-neutral-200 bg-neutral-50 p-5">
@@ -130,6 +165,22 @@ export default function Studio() {
         </button>
 
         {error && <p className="text-xs text-red-600">{error}</p>}
+
+        <div className="mt-2 flex flex-col gap-1.5 border-t border-neutral-200 pt-4">
+          <label className="text-sm font-medium text-neutral-700">Export</label>
+          <div className="flex gap-1.5">
+            <button onClick={exportPng} className="flex-1 rounded border border-neutral-300 bg-white px-2 py-1.5 text-xs text-neutral-700 hover:bg-neutral-100">
+              PNG
+            </button>
+            <button onClick={exportSvg} className="flex-1 rounded border border-neutral-300 bg-white px-2 py-1.5 text-xs text-neutral-700 hover:bg-neutral-100">
+              SVG
+            </button>
+            <button onClick={exportNotes} className="flex-1 rounded border border-neutral-300 bg-white px-2 py-1.5 text-xs text-neutral-700 hover:bg-neutral-100">
+              Notes (.md)
+            </button>
+          </div>
+          <p className="text-xs text-neutral-400">Download the board image or post-session notes.</p>
+        </div>
       </aside>
 
       <main style={{ flex: 1, height: "100%" }}>

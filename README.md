@@ -59,10 +59,18 @@ npm install      # install dependencies (first time)
 npm run dev      # local dev at http://localhost:4321/
 npm run build    # production build into dist/
 npm run preview  # preview the built output
+npm test         # run the unit tests (offline)
+npm run eval     # run the LLM eval set (needs an API key — see .env.example)
 ```
 
-Current status: **step 1 complete** — Astro + Tailwind + Excalidraw whiteboard runs and is interactive, with `excalidrawAPI` captured.
-Next: `src/dsl.ts` + `src/render.ts` (DSL → Excalidraw) + unit tests.
+You need a model key in `.env` (see `.env.example`): a **free Gemini** key
+(`GEMINI_API_KEY`, default) or a paid **Claude** key (`ANTHROPIC_API_KEY`),
+selected with `LLM_PROVIDER`.
+
+Current status: **MVP text → board → notes pipeline complete.** Paste a
+transcript → an LLM produces a validated DSL → `dagre` lays it out → it renders
+in a chosen theme; export the board as PNG/SVG and the notes as Markdown.
+Next (later): voice input, richer representations beyond flowcharts.
 
 ## Credits
 
