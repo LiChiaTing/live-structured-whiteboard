@@ -9,9 +9,12 @@
     "preview": "astro preview",
     "astro": "astro",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "eval": "RUN_EVAL=1 vitest run src/eval/eval.test.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.104.0",
+    "@astrojs/node": "^9.5.5",
     "@astrojs/react": "^4.2.0",
     "@dagrejs/dagre": "^3.0.0",
     "@excalidraw/excalidraw": "^0.18.0",

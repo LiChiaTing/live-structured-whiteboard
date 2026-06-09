@@ -4,17 +4,18 @@ import "@excalidraw/excalidraw/index.css";
 import { dslToSkeletons, opsToRenderInput } from "../render.ts";
 import { getTheme, THEMES, DEFAULT_THEME_ID } from "../theme.ts";
 import { parseLLMOutput } from "../dsl.ts";
-import { mockGenerate, EXAMPLES } from "../lib/mock-llm.ts";
+import { EXAMPLES } from "../lib/mock-llm.ts";
 
 /**
- * Studio — step 3 UI: a control panel (theme + transcript) beside the board.
+ * Studio — step 4 UI: a control panel beside the board.
  *
- * Pipeline on "Generate": transcript -> mockGenerate (stand-in LLM) ->
- * parseLLMOutput (Zod validation gate) -> opsToRenderInput -> dslToSkeletons ->
- * convertToExcalidrawElements -> updateScene. No real AI yet (step 4).
+ * "Generate" calls the real LLM via our server endpoint:
+ *   transcript -> POST /api/generate (Claude + Zod gate, server-side) -> DSL
+ *   -> opsToRenderInput -> dslToSkeletons -> convertToExcalidrawElements -> board
+ *
+ * Switching theme re-renders the SAME output locally (no extra API call/cost).
  */
 
-// Excalidraw fonts load on demand; preload so text measures correctly.
 const FONT_FAMILIES = ["Excalifont", "Nunito", "Comic Shanns"];
 const FONT_SIZES = [16, 18, 20, 28, 36];
 const preloadFonts = () =>
@@ -27,17 +28,15 @@ export default function Studio() {
   const [transcript, setTranscript] = useState(EXAMPLES[0].transcript);
   const [themeId, setThemeId] = useState(DEFAULT_THEME_ID);
   const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(false);
+  // Start with a built-in sample so the board isn't blank (no API call on load).
+  const [output, setOutput] = useState(() => parseLLMOutput(EXAMPLES[0].output));
 
-  const draw = (text, id) => {
-    if (!api) return;
-    const out = parseLLMOutput(mockGenerate(text)); // through the validation gate
-    if (!out) {
-      setError("Generated output failed validation — nothing was drawn.");
-      return;
-    }
-    setError(null);
-    const theme = getTheme(id);
-    const input = opsToRenderInput(out);
+  // Paint whenever the canvas is ready, the theme changes, or a new board is generated.
+  useEffect(() => {
+    if (!api || !output) return;
+    const theme = getTheme(themeId);
+    const input = opsToRenderInput(output);
     const paint = () => {
       const elements = convertToExcalidrawElements(dslToSkeletons(input, theme));
       api.updateScene({ elements, appState: { viewBackgroundColor: theme.pageBackground } });
@@ -47,20 +46,42 @@ export default function Studio() {
       paint();
       requestAnimationFrame(() => requestAnimationFrame(paint)); // remeasure once fonts are active
     });
-  };
+  }, [api, themeId, output]);
 
-  // Draw the starting example once the canvas is ready, and re-draw on theme change.
-  useEffect(() => {
-    draw(transcript, themeId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [api, themeId]);
+  const generate = async () => {
+    if (!transcript.trim() || loading) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ transcript }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data?.error ?? "Generation failed.");
+        return;
+      }
+      const validated = parseLLMOutput(data.output); // gate again, client-side (defensive)
+      if (!validated) {
+        setError("The generated board failed validation.");
+        return;
+      }
+      setOutput(validated);
+    } catch {
+      setError("Couldn't reach the server. Is the dev server running?");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div style={{ display: "flex", height: "100%", width: "100%" }}>
       <aside className="flex w-80 shrink-0 flex-col gap-4 overflow-y-auto border-r border-neutral-200 bg-neutral-50 p-5">
         <div>
           <h1 className="text-lg font-semibold text-neutral-900">Live Whiteboard</h1>
-          <p className="mt-1 text-xs text-neutral-500">Paste a transcript, pick a theme, generate a board. (mock AI for now)</p>
+          <p className="mt-1 text-xs text-neutral-500">Paste a transcript, pick a theme, generate a board.</p>
         </div>
 
         <div className="flex flex-col gap-1.5">
@@ -101,10 +122,11 @@ export default function Studio() {
         </div>
 
         <button
-          onClick={() => draw(transcript, themeId)}
-          className="rounded-md bg-neutral-900 py-2 text-sm font-medium text-white hover:bg-neutral-700"
+          onClick={generate}
+          disabled={loading}
+          className="rounded-md bg-neutral-900 py-2 text-sm font-medium text-white hover:bg-neutral-700 disabled:opacity-50"
         >
-          Generate board
+          {loading ? "Generating…" : "Generate board"}
         </button>
 
         {error && <p className="text-xs text-red-600">{error}</p>}
