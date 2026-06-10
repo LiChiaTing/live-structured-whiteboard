@@ -37,10 +37,12 @@ EDGE fields:
 - style: "arrow" (default, directed) or "line" (undirected association).
 
 PRINCIPLES (important — this is a low-cognitive-load whiteboard, not a transcript dump):
-- Prefer FEW nodes. Aim for about 3-8. Capture the structure and key relationships, not every sentence.
+- Prefer FEW nodes. Aim for about 3-8 main concepts. Capture the structure and key relationships, not every sentence. (Concrete examples below don't count against this — keep them.)
+- KEEP concrete examples and analogies the speaker uses to make a point (e.g. "like a concert with limited tickets", "a bakery with leftover bread"). Add the example as its own node (shape "text" or a small box, role "body") connected to the concept it illustrates (edge label "e.g."). Real examples aid understanding — don't abstract them away.
 - Choose at most one heading, and mark the single most important concept as nodePrimary (or emphasis if it's a warning/takeaway).
 - Group related nodes with the same group label.
 - Use a diamond for a decision or question.
+- For a step-by-step process or user flow, chain the steps with arrows in order so the sequence reads clearly.
 - Keep labels short. Do not invent content that isn't in the transcript.
 - noteHint: one plain-text sentence summarizing the board, for post-session notes.`;
 
