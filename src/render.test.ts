@@ -83,6 +83,36 @@ describe("computeLayout — no overlaps", () => {
   });
 });
 
+describe("representation drives the layout", () => {
+  it("flow lays out top-to-bottom (target below the source)", () => {
+    const boxes = computeLayout(F1, undefined, "flow");
+    expect(boxes.get("plant")!.y).toBeGreaterThan(boxes.get("sun")!.y);
+  });
+
+  it("concept lays out left-to-right (target right of the source)", () => {
+    const boxes = computeLayout(F1, undefined, "concept");
+    expect(boxes.get("plant")!.x).toBeGreaterThan(boxes.get("sun")!.x);
+  });
+
+  it("comparison places groups as side-by-side columns", () => {
+    const boxes = computeLayout(F3, undefined, "comparison");
+    const aRight = Math.max(
+      boxes.get("a1")!.x + boxes.get("a1")!.width,
+      boxes.get("a2")!.x + boxes.get("a2")!.width,
+    );
+    const bLeft = boxes.get("b1")!.x;
+    expect(aRight).toBeLessThanOrEqual(bLeft); // group A column sits left of group B column
+    expect(Math.abs(boxes.get("a1")!.x - boxes.get("a2")!.x)).toBeLessThan(boxes.get("a1")!.width); // stacked in one column
+  });
+
+  it.each(["flow", "concept", "comparison", "hierarchy", "timeline", "cycle"] as const)(
+    "%s lays out without overlaps",
+    (rep) => {
+      expectNoOverlaps(computeLayout(F3, undefined, rep));
+    },
+  );
+});
+
 describe("dslToSkeletons — valid, well-formed output", () => {
   it("emits one skeleton per node plus one per edge (no groups -> no frames)", () => {
     const sk = dslToSkeletons(F2);
@@ -199,6 +229,7 @@ describe("dsl validation gate", () => {
       ops: [{ op: "add", nodes: [{ id: "x", label: "X", shape: "rect" }] }],
     });
     expect(out).not.toBeNull();
+    expect(out!.representation).toBe("concept"); // default applied
     expect(out!.ops[0].nodes[0].role).toBe("nodeSecondary"); // default applied
     expect(out!.ops[0].edges).toEqual([]); // default applied
   });

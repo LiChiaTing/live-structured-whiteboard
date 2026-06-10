@@ -42,6 +42,11 @@ const EDGE_SCHEMA = {
 const RESPONSE_SCHEMA = {
   type: "object",
   properties: {
+    representation: {
+      type: "string",
+      enum: ["flow", "concept", "hierarchy", "comparison", "cycle", "timeline"],
+      description: "what kind of visual fits the content",
+    },
     ops: {
       type: "array",
       items: {
@@ -57,7 +62,7 @@ const RESPONSE_SCHEMA = {
     },
     noteHint: { type: "string", description: "one-line plain-text summary for notes" },
   },
-  required: ["ops"],
+  required: ["representation", "ops"],
 } as const;
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));

@@ -42,13 +42,21 @@ export default function Studio() {
   // Start with a built-in sample so the board isn't blank (no API call on load).
   const [output, setOutput] = useState(() => parseLLMOutput(EXAMPLES[0].output));
 
+  // Dev helper: inject a board without calling the API (window.__setBoard(rawDSL)).
+  useEffect(() => {
+    window.__setBoard = (raw) => {
+      const o = parseLLMOutput(raw);
+      if (o) setOutput(o);
+    };
+  }, []);
+
   // Paint whenever the canvas is ready, the theme changes, or a new board is generated.
   useEffect(() => {
     if (!api || !output) return;
     const theme = getTheme(themeId);
     const input = opsToRenderInput(output);
     const paint = () => {
-      const elements = convertToExcalidrawElements(dslToSkeletons(input, theme));
+      const elements = convertToExcalidrawElements(dslToSkeletons(input, theme, output.representation));
       api.updateScene({ elements, appState: { viewBackgroundColor: theme.pageBackground } });
       if (elements.length) api.scrollToContent(elements, { fitToContent: true });
     };

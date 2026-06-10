@@ -47,7 +47,24 @@ export const BoardOpSchema = z.object({
   removeIds: z.array(z.string()).default([]),
 });
 
+/**
+ * Representation — what KIND of visual best fits the content. The LLM picks
+ * one; the render layer uses a matching layout (see render.ts). This is how the
+ * board stops being "always a left-to-right flowchart" and adapts to content.
+ */
+export const RepresentationSchema = z.enum([
+  "flow", // steps / process / user journey -> top-to-bottom
+  "concept", // general related ideas (default) -> left-to-right graph
+  "hierarchy", // a root that branches -> top-to-bottom tree
+  "comparison", // two or more sides contrasted -> side-by-side columns
+  "cycle", // a repeating loop
+  "timeline", // events in time order
+]);
+export type Representation = z.infer<typeof RepresentationSchema>;
+
 export const LLMOutputSchema = z.object({
+  // how to lay the board out (the LLM chooses based on the content)
+  representation: RepresentationSchema.default("concept"),
   ops: z.array(BoardOpSchema),
   // plain-text key points for the post-session notes (optional)
   noteHint: z.string().optional(),

@@ -17,7 +17,15 @@ import { generateWithGemini } from "./providers/gemini";
 
 export const SYSTEM_PROMPT = `You turn a transcript or set of notes into a compact whiteboard structure (a "DSL"). You describe MEANING only — never positions, colors, or sizes (a layout engine and theme handle the look).
 
-Output a set of nodes and edges wrapped in a single op with "op": "add".
+First choose a "representation" — the kind of visual that best fits the content — then output the nodes and edges in a single op with "op": "add".
+
+REPRESENTATION (pick one):
+- "flow" — a process, sequence of steps, or user journey (do this → then this). Chain the steps with arrows in order.
+- "comparison" — two or more options/sides/cases being contrasted (this vs that, pros vs cons). Put each side in its own group; they'll render as side-by-side columns.
+- "hierarchy" — one root topic that breaks down into sub-parts (a tree / breakdown).
+- "cycle" — a repeating loop that returns to the start.
+- "timeline" — events in chronological order.
+- "concept" — anything else: general related ideas and relationships (the default).
 
 NODE fields:
 - id: a short, stable, lowercase slug (e.g. "sun", "photosynthesis"). Reuse the same id if the same concept recurs.

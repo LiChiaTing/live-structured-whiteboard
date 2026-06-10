@@ -1,5 +1,5 @@
 import dagre from "@dagrejs/dagre";
-import type { Edge, LLMOutput, Node } from "./dsl";
+import type { Edge, LLMOutput, Node, Representation } from "./dsl";
 import { getTheme, type RoleStyle, type Theme } from "./theme";
 
 /**
@@ -113,24 +113,27 @@ function validEdges(nodes: Node[], edges: Edge[]): Edge[] {
   return edges.filter((e) => ids.has(e.from) && ids.has(e.to));
 }
 
-/**
- * Compute each node's bounding box via dagre. Returns top-left x/y (Excalidraw
- * coords) plus width/height. Exposed so layout invariants (no overlap) can be
- * unit-tested directly.
- */
-export function computeLayout(input: RenderInput, theme: Theme = getTheme()): Map<string, Box> {
+function nodeSize(theme: Theme, n: Node): { width: number; height: number } {
+  const role = roleOf(theme, n);
+  return estimateNodeSize(n, role.fontFamily ?? fallbackFont(theme), role.fontSize ?? DEFAULT_FONT_SIZE);
+}
+
+/** dagre graph layout with a given direction/spacing. */
+function layoutDagre(
+  input: RenderInput,
+  theme: Theme,
+  opts: { rankdir: "TB" | "LR"; ranksep: number; nodesep: number },
+): Map<string, Box> {
   const { nodes } = input;
   const edges = validEdges(nodes, input.edges);
-  const fb = fallbackFont(theme);
 
   const g = new dagre.graphlib.Graph({ compound: true });
-  g.setGraph({ rankdir: "LR", nodesep: 70, ranksep: 130, marginx: 50, marginy: 50 });
+  g.setGraph({ rankdir: opts.rankdir, nodesep: opts.nodesep, ranksep: opts.ranksep, marginx: 50, marginy: 50 });
   g.setDefaultEdgeLabel(() => ({}));
 
   const sizes = new Map<string, { width: number; height: number }>();
   for (const n of nodes) {
-    const role = roleOf(theme, n);
-    const size = estimateNodeSize(n, role.fontFamily ?? fb, role.fontSize ?? DEFAULT_FONT_SIZE);
+    const size = nodeSize(theme, n);
     sizes.set(n.id, size);
     g.setNode(n.id, { ...size });
   }
@@ -152,6 +155,83 @@ export function computeLayout(input: RenderInput, theme: Theme = getTheme()): Ma
     boxes.set(n.id, { x: pos.x - width / 2, y: pos.y - height / 2, width, height });
   }
   return boxes;
+}
+
+/**
+ * Comparison layout: each group becomes a vertical column, columns sit side by
+ * side, the heading (if any) goes on top. Ungrouped nodes form a trailing
+ * column. Reads as a clean side-by-side contrast.
+ */
+function layoutComparison(input: RenderInput, theme: Theme): Map<string, Box> {
+  const { nodes } = input;
+  const MARGIN = 50;
+  const COL_GAP = 70;
+  const ROW_GAP = 36;
+  const HEAD_GAP = 50;
+
+  const boxes = new Map<string, Box>();
+  const heading = nodes.find((n) => n.role === "heading");
+  let topY = MARGIN;
+  if (heading) {
+    const s = nodeSize(theme, heading);
+    boxes.set(heading.id, { x: MARGIN, y: MARGIN, width: s.width, height: s.height });
+    topY = MARGIN + s.height + HEAD_GAP;
+  }
+
+  const colMap = new Map<string, Node[]>();
+  const ungrouped: Node[] = [];
+  for (const n of nodes) {
+    if (n === heading) continue;
+    if (n.group) {
+      if (!colMap.has(n.group)) colMap.set(n.group, []);
+      colMap.get(n.group)!.push(n);
+    } else {
+      ungrouped.push(n);
+    }
+  }
+  const columns = [...colMap.values()];
+  if (ungrouped.length) columns.push(ungrouped);
+
+  let x = MARGIN;
+  for (const col of columns) {
+    const colWidth = Math.max(...col.map((n) => nodeSize(theme, n).width), 1);
+    let y = topY;
+    for (const n of col) {
+      const s = nodeSize(theme, n);
+      boxes.set(n.id, { x: x + (colWidth - s.width) / 2, y, width: s.width, height: s.height });
+      y += s.height + ROW_GAP;
+    }
+    x += colWidth + COL_GAP;
+  }
+  return boxes;
+}
+
+/**
+ * Compute each node's bounding box, choosing a layout by representation:
+ *  - flow / hierarchy -> top-to-bottom (a long process won't sprawl sideways)
+ *  - comparison       -> side-by-side columns
+ *  - timeline         -> left-to-right
+ *  - concept / cycle  -> left-to-right graph (default)
+ * (cycle/timeline get bespoke layouts in a later pass.)
+ */
+export function computeLayout(
+  input: RenderInput,
+  theme: Theme = getTheme(),
+  representation: Representation = "concept",
+): Map<string, Box> {
+  switch (representation) {
+    case "comparison":
+      return layoutComparison(input, theme);
+    case "flow":
+    case "hierarchy":
+      return layoutDagre(input, theme, { rankdir: "TB", ranksep: 70, nodesep: 50 });
+    case "timeline":
+      return layoutDagre(input, theme, { rankdir: "LR", ranksep: 90, nodesep: 50 });
+    case "cycle":
+    case "concept":
+    default:
+      return layoutDagre(input, theme, { rankdir: "LR", ranksep: 120, nodesep: 65 });
+  }
 }
 
 /** Bounding box around all members of a group, padded — used to draw a frame. */
@@ -205,10 +285,14 @@ function labelColor(role: RoleStyle): string {
  * Build Excalidraw element skeletons from DSL nodes + edges, styled by `theme`.
  * Feed to `convertToExcalidrawElements` in the browser, then `updateScene`.
  */
-export function dslToSkeletons(input: RenderInput, theme: Theme = getTheme()): Skeleton[] {
+export function dslToSkeletons(
+  input: RenderInput,
+  theme: Theme = getTheme(),
+  representation: Representation = "concept",
+): Skeleton[] {
   const { nodes } = input;
   const edges = validEdges(nodes, input.edges);
-  const boxes = computeLayout(input, theme);
+  const boxes = computeLayout(input, theme, representation);
   const fb = fallbackFont(theme);
   const roughness = theme.roughness;
 
