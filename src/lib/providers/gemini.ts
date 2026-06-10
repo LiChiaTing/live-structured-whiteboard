@@ -91,9 +91,11 @@ export async function generateWithGemini(transcript: string, system: string): Pr
     },
   };
 
-  // The free tier is rate-limited (5 req/min). Retry on 429/503, waiting the
-  // server-suggested delay, so transient limits self-heal instead of failing.
-  const MAX_RETRIES = 4;
+  // The free tier is rate-limited. Retry on 429/503 once or twice, waiting the
+  // server-suggested delay, so transient limits self-heal. Kept short so an
+  // interactive request fails fast (with a clear message) rather than hanging
+  // when the daily free allowance is exhausted.
+  const MAX_RETRIES = 2;
   let lastErr: unknown;
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
@@ -108,7 +110,7 @@ export async function generateWithGemini(transcript: string, system: string): Pr
     } catch (err) {
       lastErr = err;
       if (!isRetryable(err) || attempt === MAX_RETRIES) break;
-      const wait = Math.min(retryDelayMs(err) ?? 4000 * 2 ** attempt, 30000) + 500;
+      const wait = Math.min(retryDelayMs(err) ?? 3000 * 2 ** attempt, 20000) + 300;
       await sleep(wait);
     }
   }
